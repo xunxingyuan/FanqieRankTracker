@@ -120,8 +120,11 @@ document.addEventListener('DOMContentLoaded', () => {
         const items = payload.items || [];
         els.feed.setAttribute('aria-busy', 'false');
         els.feedTitle.textContent = payload.tag || selectedTag;
+        const candidateSummary = payload.candidate_count
+            ? `从 ${payload.candidate_count} 个候选中筛选`
+            : '本次收录';
         els.feedSummary.textContent = items.length
-            ? `本次收录 ${items.length} 篇，按推荐流顺序展示。`
+            ? `${candidateSummary} ${items.length} 篇，${payload.ranked_by || '按推荐流顺序展示'}。`
             : '这个题材暂时没有可展示的推荐。';
 
         if (!items.length) {

@@ -1,5 +1,6 @@
 const SEARCH_ENDPOINT = 'https://novel.snssdk.com/api/novel/channel/homepage/search/search/v1/';
 const DETAIL_ENDPOINT = 'https://fanqienovel.com/page/';
+const SEARCH_OFFSETS = [0, 10, 20, 30];
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
@@ -35,6 +36,29 @@ async function fetchBookDetail(bookId) {
   }
 }
 
+async function fetchSearchPage(tag, offset) {
+  const upstreamUrl = new URL(SEARCH_ENDPOINT);
+  upstreamUrl.searchParams.set('device_platform', 'android');
+  upstreamUrl.searchParams.set('parent_enterfrom', 'novel_channel_search.tab.');
+  upstreamUrl.searchParams.set('offset', String(offset));
+  upstreamUrl.searchParams.set('aid', '1967');
+  upstreamUrl.searchParams.set('q', tag);
+
+  try {
+    const response = await fetch(upstreamUrl, {
+      headers: {
+        Accept: 'application/json',
+        'User-Agent': 'com.ss.android.article.news/7.0.3 (Linux; U; Android 12; zh_CN; Pixel 6)',
+      },
+    });
+    const payload = await response.json().catch(() => null);
+    if (!response.ok || !payload) return null;
+    return Array.isArray(payload?.data?.ret_data) ? payload.data.ret_data : [];
+  } catch {
+    return null;
+  }
+}
+
 export async function onRequestGet({ request }) {
   const requestUrl = new URL(request.url);
   const tag = (requestUrl.searchParams.get('tag') || '').trim();
@@ -42,27 +66,21 @@ export async function onRequestGet({ request }) {
     return Response.json({ error: '缺少题材标签。' }, { status: 400, headers: CORS_HEADERS });
   }
 
-  const upstreamUrl = new URL(SEARCH_ENDPOINT);
-  upstreamUrl.searchParams.set('device_platform', 'android');
-  upstreamUrl.searchParams.set('parent_enterfrom', 'novel_channel_search.tab.');
-  upstreamUrl.searchParams.set('offset', '0');
-  upstreamUrl.searchParams.set('aid', '1967');
-  upstreamUrl.searchParams.set('q', tag);
-
   try {
-    const upstreamResponse = await fetch(upstreamUrl, {
-      headers: {
-        Accept: 'application/json',
-        'User-Agent': 'com.ss.android.article.news/7.0.3 (Linux; U; Android 12; zh_CN; Pixel 6)',
-      },
-    });
-    const payload = await upstreamResponse.json().catch(() => null);
-    if (!upstreamResponse.ok || !payload) {
+    const searchPages = await Promise.all(SEARCH_OFFSETS.map(offset => fetchSearchPage(tag, offset)));
+    if (!searchPages.some(page => page !== null)) {
       return Response.json({ error: '番茄公开接口暂时不可用。' }, { status: 502, headers: CORS_HEADERS });
     }
 
-    const sourceItems = Array.isArray(payload?.data?.ret_data) ? payload.data.ret_data : [];
-    const items = await Promise.all(sourceItems.slice(0, 10).map(async (book, index) => {
+    const sourceItems = searchPages.flatMap(page => page || []);
+    const seenBookIds = new Set();
+    const candidates = sourceItems.filter((book, index) => {
+      const bookId = String(book.book_id || `search-${index}`);
+      if (seenBookIds.has(bookId)) return false;
+      seenBookIds.add(bookId);
+      return true;
+    });
+    const rankedCandidates = await Promise.all(candidates.map(async (book, index) => {
       const bookId = String(book.book_id || ('search-' + index));
       const title = book.title || '未命名短篇';
       const category = book.category || '';
@@ -83,13 +101,32 @@ export async function onRequestGet({ request }) {
         word_count: wordCount,
         metrics: { views, likes: null, comments: null, favorites: null },
         source_url: book.page_url || ('https://fanqienovel.com/page/' + bookId),
+        source_position: index,
       };
     }));
+    const items = rankedCandidates
+      .sort((left, right) => {
+        const leftViews = left.metrics.views;
+        const rightViews = right.metrics.views;
+        if (leftViews === null && rightViews !== null) return 1;
+        if (leftViews !== null && rightViews === null) return -1;
+        if (leftViews !== null && rightViews !== null && leftViews !== rightViews) {
+          return rightViews - leftViews;
+        }
+        return left.source_position - right.source_position;
+      })
+      .slice(0, 10)
+      .map((item, index) => {
+        const { source_position: _sourcePosition, ...publicItem } = item;
+        return { ...publicItem, position: index + 1 };
+      });
 
     return Response.json({
       source: '番茄小说公开接口（Cloudflare 自采）',
       tag,
       updated_at: new Date().toISOString(),
+      candidate_count: candidates.length,
+      ranked_by: '公开书页阅读量（缺失时按推荐顺序）',
       count: items.length,
       items,
     }, {
