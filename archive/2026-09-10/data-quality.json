@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "generated_at": "2026-09-10T15:30:06Z",
+  "expected_tags": 99,
+  "seven_day": {
+    "planned_window_days": 7.0,
+    "snapshot_count": 4798,
+    "successful_snapshots": 4798,
+    "failed_snapshots": 0,
+    "success_ratio": 1.0,
+    "earliest_snapshot": "2026-09-03T15:30:06Z",
+    "latest_snapshot": "2026-09-10T08:54:19Z",
+    "window_complete": true,
+    "covered_tags": 99,
+    "unique_posts": 62,
+    "appearance_rows": 46889
+  },
+  "thirty_day": {
+    "planned_window_days": 30.0,
+    "snapshot_count": 15542,
+    "successful_snapshots": 15540,
+    "failed_snapshots": 2,
+    "success_ratio": 0.999871,
+    "earliest_snapshot": "2026-08-19T04:27:05Z",
+    "latest_snapshot": "2026-09-10T08:54:19Z",
+    "window_complete": false,
+    "covered_tags": 99,
+    "unique_posts": 200,
+    "appearance_rows": 153617
+  }
+}
