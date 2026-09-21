@@ -2,8 +2,6 @@ name: Daily Fanqie Rank Scraper
 
 permissions:
   contents: write
-  pages: write
-  id-token: write
 
 concurrency:
   group: fanqie-rank-writes-main
@@ -18,9 +16,6 @@ on:
 jobs:
   scrape-and-commit:
     runs-on: ubuntu-22.04
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
 
     steps:
     - name: Checkout Repository
@@ -50,7 +45,7 @@ jobs:
       uses: actions/setup-python@v5
       with:
         python-version: '3.9'
-        cache: 'pip'
+        cache: pip
 
     - name: Install Dependencies
       run: |
@@ -82,18 +77,3 @@ jobs:
         commit_message: "[Auto] Update Fanqie daily ranks"
         file_pattern: data api
         branch: main
-
-    # ---- Deploy to GitHub Pages (inline, 绕过 GITHUB_TOKEN 不触发其他 workflow 的限制) ----
-    - name: Setup Pages
-      uses: actions/configure-pages@v5
-      with:
-        enablement: true
-
-    - name: Upload Pages artifact
-      uses: actions/upload-pages-artifact@v3
-      with:
-        path: '.'
-
-    - name: Deploy to GitHub Pages
-      id: deployment
-      uses: actions/deploy-pages@v4
