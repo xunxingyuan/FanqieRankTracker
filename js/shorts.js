@@ -170,9 +170,9 @@ document.addEventListener('DOMContentLoaded', () => {
                     <p class="short-reading-meta">${readingMeta.map(escapeHtml).join('<i>/</i>')}</p>
                     <div class="short-card-footer">
                         <dl class="short-metrics">
-                            <div><dt>浏览</dt><dd>${formatNumber(metrics.views)}</dd></div>
-                            <div><dt>点赞</dt><dd>${formatNumber(metrics.likes)}</dd></div>
-                            <div><dt>评论</dt><dd>${formatNumber(metrics.comments)}</dd></div>
+                            <div><dt>浏览</dt><dd>${formatMetric(metrics.views)}</dd></div>
+                            <div><dt>点赞</dt><dd>${formatMetric(metrics.likes)}</dd></div>
+                            <div><dt>评论</dt><dd>${formatMetric(metrics.comments)}</dd></div>
                         </dl>
                         ${sourceUrl ? `<a href="${escapeAttr(sourceUrl)}" target="_blank" rel="noopener noreferrer">打开短篇</a>` : ''}
                     </div>
@@ -230,6 +230,11 @@ document.addEventListener('DOMContentLoaded', () => {
             return `${formatted}万`;
         }
         return new Intl.NumberFormat('zh-CN').format(number);
+    }
+
+    function formatMetric(value) {
+        if (value === null || value === undefined || value === '') return '暂无';
+        return formatNumber(value);
     }
 
     function safeUrl(value) {

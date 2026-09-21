@@ -1,4 +1,5 @@
 const SEARCH_ENDPOINT = 'https://novel.snssdk.com/api/novel/channel/homepage/search/search/v1/';
+const DETAIL_ENDPOINT = 'https://fanqienovel.com/page/';
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
@@ -8,6 +9,30 @@ const CORS_HEADERS = {
 
 export async function onRequestOptions() {
   return new Response(null, { status: 204, headers: CORS_HEADERS });
+}
+
+function extractNumber(html, field) {
+  const match = html.match(new RegExp(`"${field}"\\s*:\\s*(\\d+)`));
+  return match ? Number(match[1]) : null;
+}
+
+async function fetchBookDetail(bookId) {
+  try {
+    const response = await fetch(`${DETAIL_ENDPOINT}${encodeURIComponent(bookId)}`, {
+      headers: {
+        Accept: 'text/html,application/xhtml+xml',
+        'User-Agent': 'Mozilla/5.0 (compatible; FanqieRankTracker/1.0)',
+      },
+    });
+    if (!response.ok) return {};
+    const html = await response.text();
+    return {
+      views: extractNumber(html, 'readCount'),
+      wordCount: extractNumber(html, 'wordNumber'),
+    };
+  } catch {
+    return {};
+  }
 }
 
 export async function onRequestGet({ request }) {
@@ -37,10 +62,13 @@ export async function onRequestGet({ request }) {
     }
 
     const sourceItems = Array.isArray(payload?.data?.ret_data) ? payload.data.ret_data : [];
-    const items = sourceItems.slice(0, 10).map((book, index) => {
+    const items = await Promise.all(sourceItems.slice(0, 10).map(async (book, index) => {
       const bookId = String(book.book_id || ('search-' + index));
       const title = book.title || '未命名短篇';
       const category = book.category || '';
+      const detail = bookId.startsWith('search-') ? {} : await fetchBookDetail(bookId);
+      const views = Number.isFinite(detail.views) ? detail.views : null;
+      const wordCount = Number.isFinite(detail.wordCount) ? detail.wordCount : null;
       return {
         id: bookId,
         position: index + 1,
@@ -52,11 +80,11 @@ export async function onRequestGet({ request }) {
         topics: [category, tag].filter(Boolean).slice(0, 3),
         reading_count: book.add_bookshelf_count || '',
         reading_minutes: 0,
-        word_count: 0,
-        metrics: { views: 0, likes: 0, comments: 0, favorites: 0 },
+        word_count: wordCount,
+        metrics: { views, likes: null, comments: null, favorites: null },
         source_url: book.page_url || ('https://fanqienovel.com/page/' + bookId),
       };
-    });
+    }));
 
     return Response.json({
       source: '番茄小说公开接口（Cloudflare 自采）',
